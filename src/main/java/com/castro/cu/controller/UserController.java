@@ -1,125 +1,176 @@
 package com.castro.cu.controller;
 
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
-import com.castro.cu.dto.ChangePasswordForm;
-import com.castro.cu.entity.User;
-import com.castro.cu.repository.RoleRepository;
-import com.castro.cu.service.UserService;
+import javax.validation.Valid;
+
+import com.castro.cu.entity.Role;
+import com.castro.cu.exceptions.CustomeFieldValidationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.ui.ModelMap;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.Errors;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.Mapping;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 
-import javax.validation.Valid;
-import java.util.stream.Collectors;
+import com.castro.cu.dto.ChangePasswordForm;
+import com.castro.cu.entity.User;
+import com.castro.cu.exceptions.UsernameOrIdNotFound;
+import com.castro.cu.repository.RoleRepository;
+import com.castro.cu.service.UserService;
+
 
 @Controller
 public class UserController {
 
-
-    @Autowired
-    RoleRepository roleRepository;
+    private final String TAB_FORM = "formTab";
+    private final String TAB_LIST = "listTab";
 
     @Autowired
     UserService userService;
+
+    @Autowired
+    RoleRepository roleRepository;
 
     @GetMapping({"/","/login"})
     public String index() {
         return "index";
     }
 
-    @GetMapping("/userForm")
-    public String getUserForm(Model model) {
+    @GetMapping("/signup")
+    public String signup(Model model) {
+        Role userRole = roleRepository.findByName("USER");
+        List<Role> roles = Arrays.asList(userRole);
+
+        model.addAttribute("signup",true);
         model.addAttribute("userForm", new User());
-        model.addAttribute("roles",roleRepository.findAll());
+        model.addAttribute("roles",roles);
+        return "user-form/user-signup";
+    }
+
+    @PostMapping("/signup")
+    public String signupAction(@Valid @ModelAttribute("userForm")User user, BindingResult result, ModelMap model) {
+        Role userRole = roleRepository.findByName("USER");
+        List<Role> roles = Arrays.asList(userRole);
+        model.addAttribute("userForm", user);
+        model.addAttribute("roles",roles);
+        model.addAttribute("signup",true);
+
+        if(result.hasErrors()) {
+            return "user-form/user-signup";
+        }else {
+            try {
+                userService.createUser(user);
+            } catch (CustomeFieldValidationException cfve) {
+                result.rejectValue(cfve.getFieldName(), null, cfve.getMessage());
+            }catch (Exception e) {
+                model.addAttribute("formErrorMessage",e.getMessage());
+            }
+        }
+        return index();
+    }
+
+    private void baseAttributerForUserForm(Model model, User user,String activeTab) {
+        model.addAttribute("userForm", user);
         model.addAttribute("userList", userService.getAllUsers());
-        model.addAttribute("listTab","active");
+        model.addAttribute("roles",roleRepository.findAll());
+        model.addAttribute(activeTab,"active");
+    }
+
+    @GetMapping("/userForm")
+    public String userForm(Model model) {
+        baseAttributerForUserForm(model, new User(), TAB_LIST );
         return "user-form/user-view";
     }
 
     @PostMapping("/userForm")
-    public String postUserForm(@Valid @ModelAttribute("userForm")User user, BindingResult result, ModelMap model) {
+    public String createUser(@Valid @ModelAttribute("userForm")User user, BindingResult result, Model model) {
         if(result.hasErrors()) {
-            model.addAttribute("userForm", user);
-            model.addAttribute("formTab","active");
+            baseAttributerForUserForm(model, user, TAB_FORM);
         }else {
             try {
                 userService.createUser(user);
-                model.addAttribute("userForm", new User());
-                model.addAttribute("listTab","active");
-            } catch (Exception e) {
-                model.addAttribute("formError",e.getMessage());
-                model.addAttribute("userForm", user);
-                model.addAttribute("formTab","active");
+                baseAttributerForUserForm(model, new User(), TAB_LIST );
+
+            } catch (CustomeFieldValidationException cfve) {
+                result.rejectValue(cfve.getFieldName(), null, cfve.getMessage());
+                baseAttributerForUserForm(model, user, TAB_FORM );
+            }catch (Exception e) {
+                model.addAttribute("formErrorMessage",e.getMessage());
+                baseAttributerForUserForm(model, user, TAB_FORM );
             }
         }
-
-        model.addAttribute("userList", userService.getAllUsers());
-        model.addAttribute("roles",roleRepository.findAll());
         return "user-form/user-view";
     }
 
-
     @GetMapping("/editUser/{id}")
-    public String getEditUserForm(Model model, @PathVariable(name="id") Long id) throws Exception {
-        User user = userService.getUserById(id);
+    public String getEditUserForm(Model model, @PathVariable(name ="id")Long id)throws Exception{
+        User userToEdit = userService.getUserById(id);
 
-        model.addAttribute("userList", userService.getAllUsers());
-        model.addAttribute("roles",roleRepository.findAll());
-        model.addAttribute("userForm", user);
-        model.addAttribute("passwordForm",new ChangePasswordForm(user.getId()));
-        model.addAttribute("formTab","active");
-
-        model.addAttribute("editMode",true);
+        baseAttributerForUserForm(model, userToEdit, TAB_FORM );
+        model.addAttribute("editMode","true");
+        model.addAttribute("passwordForm",new ChangePasswordForm(id));
 
         return "user-form/user-view";
     }
 
     @PostMapping("/editUser")
-    public String postEditUserForm(@Valid @ModelAttribute("userForm")User user, BindingResult result, ModelMap model) {
-        try {
-            if(result.hasErrors()) {
-                model.addAttribute("userForm", user);
-                model.addAttribute("formTab","active");
-            }else {
-                userService.updateUser(user);
-            }
-        } catch (Exception e) {
-            model.addAttribute("editMode",true);
-            model.addAttribute("userForm", user);
+    public String postEditUserForm(@Valid @ModelAttribute("userForm")User user, BindingResult result, Model model) {
+        if(result.hasErrors()) {
+            baseAttributerForUserForm(model, user, TAB_FORM );
+            model.addAttribute("editMode","true");
             model.addAttribute("passwordForm",new ChangePasswordForm(user.getId()));
-            model.addAttribute("formTab","active");
+        }else {
+            try {
+                userService.updateUser(user);
+                baseAttributerForUserForm(model, new User(), TAB_LIST );
+            } catch (Exception e) {
+                model.addAttribute("formErrorMessage",e.getMessage());
+
+                baseAttributerForUserForm(model, user, TAB_FORM );
+                model.addAttribute("editMode","true");
+                model.addAttribute("passwordForm",new ChangePasswordForm(user.getId()));
+            }
         }
-        return "redirect:/userForm";
+        return "user-form/user-view";
+
     }
 
-    @GetMapping("/editUser/cancel")
+    @GetMapping("/userForm/cancel")
     public String cancelEditUser(ModelMap model) {
         return "redirect:/userForm";
     }
 
     @GetMapping("/deleteUser/{id}")
-    public String deleteUser(Model model, @PathVariable(name="id") Long id) {
+    public String deleteUser(Model model, @PathVariable(name="id")Long id) {
         try {
             userService.deleteUser(id);
-        } catch (Exception e) {
-            model.addAttribute("deleteError","The user could not be deleted.");
         }
-        return getUserForm(model);
+        catch (UsernameOrIdNotFound uoin) {
+            model.addAttribute("listErrorMessage",uoin.getMessage());
+        }
+        return userForm(model);
     }
 
     @PostMapping("/editUser/changePassword")
-    public ResponseEntity<?> postEditUseChangePassword(@Valid @RequestBody ChangePasswordForm form, Errors errors) {
+    public ResponseEntity postEditUseChangePassword(@Valid @RequestBody ChangePasswordForm form, Errors errors) {
         try {
-            //If error, just return a 400 bad request, along with the error message
-            if (errors.hasErrors()) {
+            if( errors.hasErrors()) {
                 String result = errors.getAllErrors()
                         .stream().map(x -> x.getDefaultMessage())
-                        .collect(Collectors.joining("<br/>"));
+                        .collect(Collectors.joining(""));
 
                 throw new Exception(result);
             }
@@ -127,6 +178,7 @@ public class UserController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }
-        return ResponseEntity.ok("success");
+        return ResponseEntity.ok("Success");
     }
+
 }

@@ -3,18 +3,21 @@ package com.castro.cu;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configuration.WebSecurityConfigurerAdapter;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import com.castro.cu.service.UserDetailsServiceImpl;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 //Indica que esta clase es de configuracion y necesita ser cargada durante el inicio del server
 @Configuration
 @EnableWebSecurity
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter{
+public class WebSecurityConfig  extends  WebSecurityConfigurerAdapter{
 
     String[] resources = new String[]{
             "/include/**","/css/**","/icons/**","/img/**","/js/**","/layer/**"
@@ -25,7 +28,7 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter{
         http
                 .authorizeRequests()
                 .antMatchers(resources).permitAll()
-                .antMatchers("/","/index").permitAll()
+                .antMatchers("/","/index","/signup").permitAll()
                 .anyRequest().authenticated()
                 .and()
                 .formLogin()
@@ -42,20 +45,21 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter{
                 .logoutSuccessUrl("/login?logout");
     }
 
-    BCryptPasswordEncoder bCryptPasswordEncoder;
+    /*BCryptPasswordEncoder bCryptPasswordEncoder;
 
-    @Autowired
+    @Bean
     public BCryptPasswordEncoder passwordEncoder() {
         bCryptPasswordEncoder = new BCryptPasswordEncoder(4);
         return bCryptPasswordEncoder;
-    }
+    }*/
 
     @Autowired
-    UserDetailsServiceImpl userDetailsService;
+    UserDetailsService userDetailsService;
 
     @Autowired
     public void configureGlobal(AuthenticationManagerBuilder auth) throws Exception {
         //Especificar el encargado del login y encriptacion del password
-        auth.userDetailsService(userDetailsService).passwordEncoder(passwordEncoder());
+        auth.userDetailsService(userDetailsService).passwordEncoder(EncoderConfig.passwordEncoder());
     }
+
 }
