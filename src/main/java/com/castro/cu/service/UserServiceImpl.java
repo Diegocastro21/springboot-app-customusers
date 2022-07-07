@@ -4,6 +4,8 @@ import com.castro.cu.dto.ChangePasswordForm;
 import com.castro.cu.entity.User;
 import com.castro.cu.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import java.util.Optional;
@@ -30,6 +32,7 @@ public class UserServiceImpl implements UserService{
         }
         return formUser;
     }
+
 
     private boolean checkUsernameExists(User user) throws Exception{
         Optional<User> existentUser = userRepository.findByUsername(user.getUsername());
@@ -85,9 +88,9 @@ public class UserServiceImpl implements UserService{
                 .findById( form.getId() )
                 .orElseThrow(() -> new Exception("UsernotFound in ChangePassword."));
 
-        /*if( !isLoggedUserADMIN() && form.getCurrentPassword().equals(storedUser.getPassword())) {
+        if( !isLoggedUserADMIN() && form.getCurrentPassword().equals(storedUser.getPassword())) {
             throw new Exception("Current Password Incorrect.");
-        }*/
+        }
 
         if ( form.getCurrentPassword().equals(form.getNewPassword())) {
             throw new Exception("New Password must be different than Current Password!");
@@ -101,7 +104,7 @@ public class UserServiceImpl implements UserService{
         return userRepository.save(storedUser);
     }
 
-    /*private boolean isLoggedUserADMIN() {
+    private boolean isLoggedUserADMIN() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         UserDetails loggedUser = null;
         if (principal instanceof UserDetails) {
@@ -111,6 +114,6 @@ public class UserServiceImpl implements UserService{
                     .filter(x -> "ADMIN".equals(x.getAuthority() ))
                     .findFirst().orElse(null);
         }
-        return loggedUser != null ?true :false;
-    }*/
+        return loggedUser != null ? true :false;
+    }
 }
