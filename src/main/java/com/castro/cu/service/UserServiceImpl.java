@@ -1,5 +1,6 @@
 package com.castro.cu.service;
 
+import com.castro.cu.dto.ChangePasswordForm;
 import com.castro.cu.entity.User;
 import com.castro.cu.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,7 +9,7 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @Service
-public class UserServiceImpl implements  UserService{
+public class UserServiceImpl implements UserService{
 
     @Autowired
     UserRepository userRepository;
@@ -79,5 +80,37 @@ public class UserServiceImpl implements  UserService{
         userRepository.delete(user);
     }
 
+    public User changePassword(ChangePasswordForm form) throws Exception{
+        User storedUser = userRepository
+                .findById( form.getId() )
+                .orElseThrow(() -> new Exception("UsernotFound in ChangePassword."));
 
+        /*if( !isLoggedUserADMIN() && form.getCurrentPassword().equals(storedUser.getPassword())) {
+            throw new Exception("Current Password Incorrect.");
+        }*/
+
+        if ( form.getCurrentPassword().equals(form.getNewPassword())) {
+            throw new Exception("New Password must be different than Current Password!");
+        }
+
+        if( !form.getNewPassword().equals(form.getConfirmPassword())) {
+            throw new Exception("New Password and Confirm Password does not match!");
+        }
+
+        storedUser.setPassword(form.getNewPassword());
+        return userRepository.save(storedUser);
+    }
+
+    /*private boolean isLoggedUserADMIN() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        UserDetails loggedUser = null;
+        if (principal instanceof UserDetails) {
+            loggedUser = (UserDetails) principal;
+
+            loggedUser.getAuthorities().stream()
+                    .filter(x -> "ADMIN".equals(x.getAuthority() ))
+                    .findFirst().orElse(null);
+        }
+        return loggedUser != null ?true :false;
+    }*/
 }

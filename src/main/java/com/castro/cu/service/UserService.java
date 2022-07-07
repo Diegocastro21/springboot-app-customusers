@@ -1,5 +1,6 @@
 package com.castro.cu.service;
 
+import com.castro.cu.dto.ChangePasswordForm;
 import com.castro.cu.entity.User;
 
 import javax.validation.Valid;
@@ -15,5 +16,7 @@ public interface UserService {
     public User updateUser(User user) throws Exception;
 
     public void deleteUser(Long id)throws Exception;
+
+    public User changePassword(ChangePasswordForm form) throws Exception;
 
 }
